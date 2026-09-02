@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>מיקום חי — Voyat</title>
+
+<!--
+  ============================================================
+  Voyat — עמוד הצפייה במיקום חי.
+
+  ⚠️ העמוד הזה **אינו חלק מהאפליקציה**. הוא קובץ יחיד שמעלים
+  לאירוח סטטי חינמי (Cloudflare Pages / Netlify / GitHub Pages),
+  והוא מה שנפתח אצל מי שקיבל את הקישור. הוא חייב לעבוד בכל
+  דפדפן, בלי התקנה ובלי חשבון.
+
+  ⚠️⚠️ **האסימון נמצא אחרי ה-# ולא כפרמטר שאילתה.** מה שאחרי
+  ה-# לא נשלח לשרת בבקשת ה-HTTP, ולכן הוא אינו נכתב ללוגים של
+  שרת האירוח ואינו דולף ב-Referer. זו הסיבה היחידה לבחירה הזו.
+
+  ⚠️ המפה היא OpenStreetMap דרך Leaflet — בלי מפתח ובלי עלות.
+  אם הטעינה נכשלת, העמוד עדיין מציג קואורדינטות וקישור לגוגל
+  מפות. מסך חירום לא נשען על ספרייה חיצונית.
+
+  לפני העלאה: להחליף SUPABASE_URL ו-SUPABASE_ANON_KEY למטה.
+  ⚠️ המפתח האנונימי מיועד לחשיפה בדפדפן. **לעולם לא**
+  להעתיק לכאן את ה-service_role.
+  ============================================================
+-->
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root {
+    --bg: #f4f5f9; --card: #fff; --ink: #131735; --slate: #6b7191;
+    --line: #e3e6ef; --navy: #1b2148; --warn-bg: #fdf0d5; --warn: #8a5a00;
+    --bad-bg: #fdecea; --bad: #b3261e; --ok-bg: #e6f4ec; --ok: #1c6b40;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1120; --card: #171b2e; --ink: #eef0f8; --slate: #9aa0bd;
+      --line: #262b45; --navy: #0b0f22; --warn-bg: #3a2e12; --warn: #f0c060;
+      --bad-bg: #3a1c1a; --bad: #ff8a80; --ok-bg: #14301f; --ok: #7fd6a2;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 620px; margin: 0 auto; padding: 14px; }
+  .head { background: var(--navy); color: #fff; border-radius: 16px; padding: 14px 16px; }
+  .head h1 { margin: 0; font-size: 18px; }
+  .head p { margin: 4px 0 0; font-size: 12.5px; color: #9ba1bf; line-height: 1.6; }
+  #map { height: 320px; border-radius: 16px; margin-top: 12px; background: var(--card); border: 1px solid var(--line); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 13px; margin-top: 12px; }
+  .row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; font-size: 13.5px; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .k { color: var(--slate); }
+  .v { font-weight: 700; }
+  .coords { direction: ltr; text-align: left; font-variant-numeric: tabular-nums; }
+  .banner { border-radius: 12px; padding: 11px 13px; font-size: 13px; line-height: 1.6; margin-top: 12px; font-weight: 600; }
+  .banner.warn { background: var(--warn-bg); color: var(--warn); }
+  .banner.bad { background: var(--bad-bg); color: var(--bad); }
+  .banner.ok { background: var(--ok-bg); color: var(--ok); }
+  a.btn {
+    display: block; text-align: center; text-decoration: none; margin-top: 12px;
+    background: var(--navy); color: #fff; border-radius: 12px; padding: 13px;
+    font-weight: 700; font-size: 14px;
+  }
+  .foot { color: var(--slate); font-size: 11px; line-height: 1.7; margin-top: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1 id="title">מיקום חי</h1>
+    <p id="sub">טוען…</p>
+  </div>
+
+  <div id="banner" class="banner warn">מתחבר…</div>
+  <div id="map"></div>
+
+  <div class="card">
+    <div class="row"><span class="k">עודכן</span><span class="v" id="age">—</span></div>
+    <div class="row"><span class="k">מצב</span><span class="v" id="moving">—</span></div>
+    <div class="row"><span class="k">דיוק</span><span class="v" id="acc">—</span></div>
+    <div class="row"><span class="k">נקודות ציון</span><span class="v coords" id="coords">—</span></div>
+    <div class="row"><span class="k">השיתוף מסתיים</span><span class="v" id="until">—</span></div>
+  </div>
+
+  <a class="btn" id="gmaps" href="#" target="_blank" rel="noopener">פתח בגוגל מפות ›</a>
+
+  <p class="foot">
+    העמוד מתרענן לבד כל 15 שניות. השיתוף נסגר לבד בזמן שנקבע,
+    ואפשר לעצור אותו מהאפליקציה בכל רגע.
+    <br />הנתונים כאן הם מה שהמכשיר דיווח לאחרונה — לא בהכרח המיקום ברגע זה.
+  </p>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ⚠️ להחליף לפני העלאה. שניהם ציבוריים ומיועדים לדפדפן. */
+var SUPABASE_URL = "https://gkcmlpkpfyaiasryfqem.supabase.co";
+var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdrY21scGtwZnlhaWFzcnlmcWVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0OTQ1ODIsImV4cCI6MjEwMzA3MDU4Mn0.x5dlGJ6hFWciRGqkG_ae1DeMYAgk-3MsXUARlvTAkJU";
+
+var token = (location.hash || "").replace(/^#/, "").trim();
+var map = null, marker = null, line = null, failures = 0;
+
+function el(id) { return document.getElementById(id); }
+function banner(kind, text) {
+  var b = el("banner");
+  b.className = "banner " + kind;
+  b.textContent = text;
+}
+/* ⚠️ שתי צורות, כי הן נכנסות למשפטים שונים:
+   "עודכן לפני 7 דקות"  מול  "אין עדכון כבר 7 דקות".
+   שימוש באותה מחרוזת ייצר "אין עדכון כבר לפני 7 דקות". */
+function duration(sec) {
+  if (sec < 60) return sec + " שניות";
+  if (sec < 3600) return Math.round(sec / 60) + " דקות";
+  return Math.round(sec / 3600) + " שעות";
+}
+function ageText(sec) { return "לפני " + duration(sec); }
+function untilText(iso) {
+  var mins = Math.round((Date.parse(iso) - Date.now()) / 60000);
+  if (mins <= 0) return "הסתיים";
+  if (mins < 60) return "בעוד " + mins + " דקות";
+  return "בעוד " + Math.round(mins / 60) + " שעות";
+}
+
+/* כיוון התנועה — אותה נוסחה כמו באפליקציה (services/liveShare.js) */
+function bearing(a, b) {
+  var rad = function (d) { return d * Math.PI / 180; };
+  var dLng = rad(b[1] - a[1]);
+  var y = Math.sin(dLng) * Math.cos(rad(b[0]));
+  var x = Math.cos(rad(a[0])) * Math.sin(rad(b[0]))
+        - Math.sin(rad(a[0])) * Math.cos(rad(b[0])) * Math.cos(dLng);
+  return (Math.round(Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+}
+var COMPASS = ["צפונה","צפון-מזרחה","מזרחה","דרום-מזרחה","דרומה","דרום-מערבה","מערבה","צפון-מערבה"];
+function compass(deg) { return COMPASS[Math.round(((deg % 360) + 360) % 360 / 45) % 8]; }
+
+function meters(a, b) {
+  var rad = function (d) { return d * Math.PI / 180; };
+  var s = Math.pow(Math.sin(rad(b[0] - a[0]) / 2), 2)
+        + Math.cos(rad(a[0])) * Math.cos(rad(b[0])) * Math.pow(Math.sin(rad(b[1] - a[1]) / 2), 2);
+  return Math.round(2 * 6371000 * Math.asin(Math.sqrt(s)));
+}
+
+function draw(lat, lng, path) {
+  if (!window.L) return;                       /* ⚠️ המפה לא חובה */
+  if (!map) {
+    map = L.map("map").setView([lat, lng], 15);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19, attribution: "© OpenStreetMap",
+    }).addTo(map);
+    marker = L.marker([lat, lng]).addTo(map);
+    line = L.polyline([], { weight: 4 }).addTo(map);
+  }
+  marker.setLatLng([lat, lng]);
+  map.setView([lat, lng], map.getZoom());
+  var pts = (path || []).map(function (p) { return [p.lat, p.lng]; });
+  pts.push([lat, lng]);
+  line.setLatLngs(pts);
+}
+
+async function tick() {
+  if (!token) {
+    banner("bad", "הקישור חסר את מזהה השיתוף.");
+    el("sub").textContent = "בקש קישור חדש.";
+    return;
+  }
+  try {
+    var res = await fetch(SUPABASE_URL + "/rest/v1/rpc/live_location_get", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: "Bearer " + SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ p_token: token }),
+    });
+    if (!res.ok) throw new Error("http " + res.status);
+    var rows = await res.json();
+    var r = rows && rows[0];
+
+    if (!r) {
+      banner("bad", "השיתוף הסתיים או שהקישור אינו תקף.");
+      el("sub").textContent = "המיקום כבר אינו משותף.";
+      return;
+    }
+    failures = 0;
+
+    var ageSec = Math.max(0, Math.round((Date.now() - Date.parse(r.updated_at)) / 1000));
+    var stale = ageSec > 120;
+
+    el("title").textContent = r.label ? ("מיקום חי — " + r.label) : "מיקום חי";
+    el("sub").textContent = "העמוד מתעדכן לבד. אין צורך לרענן.";
+    el("age").textContent = ageText(ageSec);
+    el("acc").textContent = r.accuracy ? ("כ-" + r.accuracy + " מטר") : "—";
+    el("until").textContent = untilText(r.expires_at);
+
+    if (r.lat === null || r.lng === null) {
+      banner("warn", "השיתוף נפתח, אבל עדיין לא התקבל מיקום.");
+      el("moving").textContent = "ממתין למיקום";
+      el("coords").textContent = "—";
+      return;
+    }
+
+    el("coords").textContent = r.lat.toFixed(5) + ", " + r.lng.toFixed(5);
+    el("gmaps").href = "https://maps.google.com/?q=" + r.lat + "," + r.lng;
+
+    var path = Array.isArray(r.path) ? r.path : [];
+    var prev = path.length ? path[path.length - 1] : null;
+    if (prev && meters([prev.lat, prev.lng], [r.lat, r.lng]) >= 20) {
+      el("moving").textContent = "בתנועה " + compass(bearing([prev.lat, prev.lng], [r.lat, r.lng]));
+    } else {
+      el("moving").textContent = "עומד במקום";
+    }
+
+    /* ⚠️ גיל הנתון הוא ההודעה החשובה. נקודה ישנה שמוצגת כאילו
+       היא "עכשיו" מסוכנת יותר מאשר לא להציג כלום. */
+    if (stale) banner("warn", "⚠️ אין עדכון כבר " + duration(ageSec) + ". ייתכן שהאפליקציה נסגרה או שאין קליטה.");
+    else banner("ok", "מתעדכן עכשיו");
+
+    draw(r.lat, r.lng, path);
+  } catch (e) {
+    failures++;
+    if (failures >= 2) banner("bad", "אין חיבור לשרת. מנסה שוב…");
+  }
+}
+
+tick();
+setInterval(tick, 15000);
+window.addEventListener("hashchange", function () {
+  token = (location.hash || "").replace(/^#/, "").trim();
+  tick();
+});
+</script>
+</body>
+</html>
