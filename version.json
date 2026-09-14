@@ -1,1 +1,7 @@
-https://github.com/yanivcho/voyat-live/new/main?filename=version.json
+{
+  "version": "1.7.0",
+  "mandatory": false,
+  "notes": "ארנק לפי סוג המסמך · רישיון נהיגה בינלאומי · מיקום חירום לאיש קשר · המרת מטבע בלי רשת",
+  "url": "https://yanivcho.github.io/voyat-live/",
+  "builtAt": "2026-09-14"
+}
