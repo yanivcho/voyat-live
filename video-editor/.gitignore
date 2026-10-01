@@ -1,0 +1,5 @@
+# Videos, transcripts, masks and renders are personal and large: they never go into git.
+projects/*
+!projects/_template/
+__pycache__/
+*.pyc

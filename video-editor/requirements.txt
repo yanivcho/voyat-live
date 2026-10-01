@@ -1,0 +1,4 @@
+numpy>=2.0
+opencv-python-headless>=4.10
+pillow>=10.0        # with RAQM (needs libfribidi on the system) for right-to-left Hebrew
+rembg[cpu]>=2.0.60  # person segmentation (u2net_human_seg) + onnxruntime (also runs Silero VAD)
